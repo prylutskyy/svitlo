@@ -1,0 +1,12 @@
+<resources>
+    <string name="widget_preview_address">Дім</string>
+    <string name="widget_preview_state">Аварійне зараз</string>
+    <string name="widget_preview_time">≈ 18:30</string>
+    <string name="widget_preview_example">Приклад · відновлення</string>
+    <string name="widget_description">Одна важлива подія: адреса, час і стан відключення. Деталі та всі адреси — натисканням.</string>
+    <string name="widget_title">Світло</string>
+    <string name="widget_configure">Налаштувати віджет</string>
+    <string name="widget_more">⋯</string>
+    <string name="widget_chart_description">Графіки адрес</string>
+    <string name="widget_choose_addresses">Оберіть адреси в налаштуваннях віджета</string>
+</resources>

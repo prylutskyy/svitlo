@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_host" android:layout_width="match_parent" android:layout_height="match_parent">
+<LinearLayout
+    android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:padding="12dp" android:background="@drawable/widget_light">
+    <LinearLayout android:id="@+id/widget_focus" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:visibility="gone">
+        <LinearLayout android:id="@+id/focus_header" android:layout_width="match_parent" android:layout_height="44dp" android:gravity="center_vertical">
+            <ImageView android:id="@+id/focus_power_icon" android:layout_width="16dp" android:layout_height="16dp" android:layout_marginEnd="4dp" android:scaleType="fitCenter" />
+<TextView android:id="@+id/focus_address" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent"
+                android:gravity="center_vertical" android:fontFamily="sans-serif-medium" android:includeFontPadding="false" android:singleLine="true" android:ellipsize="end" />
+            <TextView android:id="@+id/focus_configure" android:layout_width="44dp" android:layout_height="match_parent" android:gravity="center"
+                android:text="@string/widget_more" android:textSize="24sp" android:contentDescription="@string/widget_configure" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/focus_event" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:id="@+id/focus_state" android:layout_width="match_parent" android:layout_height="wrap_content" android:includeFontPadding="false"
+                android:fontFamily="sans-serif-medium" android:maxLines="2" android:ellipsize="end" android:paddingBottom="6dp" />
+            <TextView android:id="@+id/focus_label" android:layout_width="match_parent" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="2" android:ellipsize="end" />
+            <TextView android:id="@+id/focus_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:includeFontPadding="false"
+                android:fontFamily="sans-serif-light" android:singleLine="true" android:ellipsize="end" android:paddingTop="2dp" android:paddingBottom="4dp" />
+            <TextView android:id="@+id/focus_caption" android:layout_width="match_parent" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="2" android:ellipsize="end" />
+        </LinearLayout>
+        <TextView android:id="@+id/focus_footer" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="44dp"
+            android:gravity="center_vertical" android:includeFontPadding="false" android:paddingTop="8dp" android:maxLines="2" android:ellipsize="end" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/widget_header" android:layout_width="match_parent" android:layout_height="40dp" android:gravity="center_vertical">
+        <TextView android:id="@+id/widget_title" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:text="@string/widget_title" android:textSize="16sp" android:fontFamily="sans-serif-medium" android:includeFontPadding="false" android:singleLine="true" android:ellipsize="end" />
+        <TextView android:id="@+id/widget_overflow" android:layout_width="wrap_content" android:layout_height="match_parent"
+            android:gravity="center" android:paddingStart="8dp" android:paddingEnd="8dp" android:textSize="14sp" android:visibility="gone" />
+        <TextView android:id="@+id/widget_configure" android:layout_width="48dp" android:layout_height="match_parent"
+            android:gravity="center" android:text="@string/widget_more" android:textSize="24sp" android:contentDescription="@string/widget_configure" />
+    </LinearLayout>
+    <TextView android:id="@+id/widget_empty" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:text="@string/widget_choose_addresses" />
+    <ViewFlipper android:id="@+id/widget_transition" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:animateFirstView="true" android:autoStart="false" android:inAnimation="@anim/widget_fade_in" android:outAnimation="@anim/widget_fade_out">
+    <ImageView android:id="@+id/widget_chart" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:adjustViewBounds="true" android:scaleType="fitStart" android:contentDescription="@string/widget_chart_description" />
+    <ImageView android:id="@+id/widget_chart_alt" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:adjustViewBounds="true" android:scaleType="fitStart" android:contentDescription="@string/widget_chart_description" />
+    </ViewFlipper>
+</LinearLayout>
+
+</FrameLayout>

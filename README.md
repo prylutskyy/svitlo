@@ -71,6 +71,26 @@
 - Помилка мережі або застарілі дані позначаються окремо. Минуле орієнтовне завершення не вважається підтвердженням відновлення.
 - Android може затримувати фонові оновлення та сповіщення.
 
+## Збірка з вихідного коду
+
+Відкрийте папку **`android/`** в Android Studio, встановіть **Android SDK 37** і дочекайтесь Gradle Sync. Gradle Wrapper уже входить до репозиторію.
+
+```bash
+cd android
+./gradlew :app:assembleDebug :app:testDebugUnitTest
+```
+
+На Windows можна використати PowerShell:
+
+```powershell
+cd android
+.\build.ps1
+```
+
+APK буде створено в `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+Вихідний код: [`android/app/src/main/`](android/app/src/main/). JVM-тести: [`android/app/src/test/`](android/app/src/test/), Android-тести: [`android/app/src/androidTest/`](android/app/src/androidTest/). Локальні SDK-шляхи та ключі підпису до репозиторію не входять.
+
 ## Зворотний зв’язок
 
 Знайшли помилку або маєте ідею? [Створіть issue](https://github.com/prylutskyy/svitlo/issues/new). Для проблем із віджетом додайте модель телефона, версію Android, розмір віджета та скріншот. Особисту адресу можна приховати.

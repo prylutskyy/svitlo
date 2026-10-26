@@ -1,0 +1,9 @@
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorAccent">#A0D3B3</item>
+        <item name="android:windowBackground">#10150F</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>
