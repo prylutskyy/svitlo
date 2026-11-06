@@ -29,4 +29,4 @@
 .\android\build.ps1
 ```
 
-Вихідний код — `android/app/src`; тести — `android/app/src/test` і `android/app/src/androidTest`. APK у релізах — локальні тестові debug-збірки.
+Вихідний код — `android/app/src`; тести — `android/app/src/test` і `android/app/src/androidTest`. Починаючи з 0.5.1, APK у релізах оптимізовано через R8. Для оновлення попередніх інсталяцій збережено наявний debug-ключ підпису; release-збірка не є debuggable.

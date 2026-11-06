@@ -1,0 +1,1 @@
+PASS: debug-to-R8 in-place update; old JSON schema read; nested queue schedule and enums; details; rename/save; process restart; no app crash.

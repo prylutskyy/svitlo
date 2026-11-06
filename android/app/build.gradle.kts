@@ -9,9 +9,19 @@ android {
         applicationId = "ua.svitlo.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.5.0"
+        versionCode = 8
+        versionName = "0.5.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // Keep updates compatible with the APKs already distributed on GitHub.
+            // This is the existing development signing identity, not a new production key.
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
     }
     buildFeatures { compose = true }
     compileOptions {
