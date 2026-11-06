@@ -11,7 +11,7 @@ data class HistoryIncident(val id: Long, val start: Long, val firstSeen: Long, v
 data class HistoryReport(val start: Long, val end: Long, val intervals: List<HistoryInterval>,
     val incidents: List<HistoryIncident>, val recordedSince: Long?) {
     fun millis(state: PowerState) = intervals.filter { it.state == state }.sumOf { it.end - it.start }
-    val outageMillis get() = millis(PowerState.EMERGENCY_OUTAGE) + millis(PowerState.CONFIRMED_OUTAGE)
+    val outageMillis get() = millis(PowerState.EMERGENCY_OUTAGE) + millis(PowerState.CONFIRMED_OUTAGE) + millis(PowerState.SCHEDULED_OUTAGE)
     val totalMillis get() = (end - start).coerceAtLeast(0)
 }
 

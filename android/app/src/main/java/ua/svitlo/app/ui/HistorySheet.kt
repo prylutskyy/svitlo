@@ -14,7 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -31,6 +36,8 @@ internal fun historyDuration(millis: Long): String {
     val minutes = (millis.coerceAtLeast(0) / 60_000)
     return when {
         millis > 0 && minutes == 0L -> "< 1 хв"
+        minutes >= 43200 -> "≈ ${minutes / 43200} міс. ${minutes % 43200 / 1440} д"
+        minutes >= 1440 -> "${minutes / 1440} д ${minutes % 1440 / 60} год"
         minutes < 60 -> "$minutes хв"
         minutes % 60 == 0L -> "${minutes / 60} год"
         else -> "${minutes / 60} год ${minutes % 60} хв"
@@ -66,8 +73,8 @@ internal fun historyDuration(millis: Long): String {
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 Column {
-                        Text(address.title,style = MaterialTheme.typography.headlineMedium)
-                        Text(address.description,style = MaterialTheme.typography.bodyMedium,color = colors.onSurfaceVariant)
+                        Text(homeIdentity(address).title,style = MaterialTheme.typography.headlineMedium)
+                        Text(homeIdentity(address).subtitle,style = MaterialTheme.typography.bodyMedium,color = colors.onSurfaceVariant)
                 }
             }
             item {
@@ -86,24 +93,19 @@ internal fun historyDuration(millis: Long): String {
                     item {
                         Surface(shape = MaterialTheme.shapes.extraLarge,color = colors.surfaceContainerLow) {
                             Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Адресні відключення",style = MaterialTheme.typography.labelLarge,color = colors.onSurface)
-                                Text("≈ ${historyDuration(report.outageMillis)}",style = MaterialTheme.typography.headlineLarge,color = colors.onSurface)
+                                Text("Відключення у графіку",style = MaterialTheme.typography.labelLarge,color = colors.onSurface)
+                                Text(historyDuration(report.outageMillis),style = MaterialTheme.typography.headlineLarge,color = colors.onSurface)
                                 Text("${Instant.ofEpochMilli(report.start).atZone(KYIV).format(historyDate)} — ${now.atZone(KYIV).format(historyDate)}",
                                     style = MaterialTheme.typography.bodySmall,color = colors.onSurface)
                             }
                         }
                     }
                     item { HistoryBreakdown(report) }
-                    item { Disclosure("Як рахуємо") {
-                        Text("За даними джерела, без вимірювання напруги. Ймовірні інтервали не входять у суму відключень.",style = MaterialTheme.typography.bodySmall)
-                        Text("Пропуски перевірок позначаємо як невідомі. Історія зберігається на пристрої.",style = MaterialTheme.typography.bodySmall)
-                        Text("Перший запис: ${Instant.ofEpochMilli(report.recordedSince!!).atZone(KYIV).format(historyDate)}",style = MaterialTheme.typography.labelMedium)
-                    } }
-                    item { Text("Журнал подій ВОЕ",style = MaterialTheme.typography.titleLarge) }
-                    if (report.incidents.isEmpty()) item {
+                    item { Text("Журнал подій",style = MaterialTheme.typography.titleLarge) }
+                    if (HistoryJournal.events(report).isEmpty()) item {
                         Text("Подій немає",color = colors.onSurfaceVariant)
                     }
-                    val days = HistoryJournal.days(report.incidents).entries.toList()
+                    val days = HistoryJournal.days(HistoryJournal.events(report)).entries.toList()
                     days.take(shown).forEach { (date,events) ->
                         val key = date.toString()
                         val expanded = key in openDays
@@ -146,12 +148,14 @@ internal fun historyDuration(millis: Long): String {
                     tint = if (incident.emergency) colors.error else colors.primary,modifier = Modifier.size(20.dp))
                 Column(Modifier.weight(1f)) {
                     Text(time(incident.start),style = MaterialTheme.typography.titleLarge)
-                    Text(if (incident.emergency) "Аварійне" else if (incident.reason.contains("ГПВ")) "ГПВ" else "Відключення",
+                    Text(if (incident.reason == "За опублікованим графіком") "Планове" else if (incident.emergency) "Аварійне" else if (incident.reason.contains("ГПВ")) "ГПВ" else "Відключення",
                         style = MaterialTheme.typography.bodyMedium)
                 }
-                Text(incident.disappearedAt?.let { "Знято ${time(it)}" } ?: "Не закрито",style = MaterialTheme.typography.bodyMedium,color = colors.onSurfaceVariant)
+                Text(if(incident.reason == "За опублікованим графіком") historyDuration(incident.lastSeen-incident.start) else incident.disappearedAt?.let { "Знято ${time(it)}" } ?: "Не закрито",style = MaterialTheme.typography.bodyMedium,color = colors.onSurfaceVariant)
             }
-            if (expanded) {
+            if (expanded && incident.reason == "За опублікованим графіком") {
+                Text("${time(incident.start)} – ${time(incident.lastSeen)} · за графіком",style=MaterialTheme.typography.bodyMedium)
+            } else if (expanded) {
                 if (incident.reason.isNotBlank()) Text(incident.reason,style = MaterialTheme.typography.bodyMedium)
                 Text("Останнє спостереження: ${Instant.ofEpochMilli(incident.lastSeen).atZone(KYIV).format(historyDate)}",style = MaterialTheme.typography.bodyMedium)
                 incident.estimatedEnd?.let { Text("Прогноз: ${Instant.ofEpochMilli(it).atZone(KYIV).format(historyDate)}",style = MaterialTheme.typography.bodyMedium) }
@@ -173,12 +177,12 @@ internal fun historyDuration(millis: Long): String {
         Triple(PowerState.UNKNOWN,"Невідомо",colors.outlineVariant)).filter { report.millis(it.first) > 0 }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         val description = rows.joinToString(". ") { (state,label,_) -> "$label: ${historyDuration(report.millis(state))}" }
-        Canvas(Modifier.fillMaxWidth().height(18.dp).semantics { contentDescription = description }) {
+        Canvas(Modifier.fillMaxWidth().height(18.dp).clip(RoundedCornerShape(50)).semantics { contentDescription = description }) {
             var x = 0f
             rows.forEach { (state,_,color) ->
                 val width = if (report.totalMillis > 0) size.width * report.millis(state).toFloat() / report.totalMillis else 0f
-                drawRect(color,Offset(x,0f),Size(width,size.height))
-                if (state == PowerState.POSSIBLE_OUTAGE) clipRect(x,0f,x+width,size.height) {
+                drawRoundRect(color,Offset(x,0f),Size(width,size.height),CornerRadius(size.height/2,size.height/2))
+                if (state == PowerState.POSSIBLE_OUTAGE) clipPath(Path().apply { addRoundRect(RoundRect(x,0f,x+width,size.height,CornerRadius(size.height/2,size.height/2))) }) {
                     var line = x-size.height
                     while (line < x+width) { drawLine(Color.White.copy(alpha = 0.7f),Offset(line, size.height),Offset(line+size.height,0f),2.dp.toPx()); line += 7.dp.toPx() }
                 }

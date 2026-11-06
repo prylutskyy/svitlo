@@ -2,6 +2,8 @@
 package ua.svitlo.app.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
@@ -15,38 +17,19 @@ import ua.svitlo.app.domain.*
 @Composable internal fun GuidePage(state: AppState,onBack: () -> Unit,onAndroidSettings: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     FullScreenPage("Про застосунок",onBack) {
-        LazyColumn(Modifier.fillMaxSize(),contentPadding = PaddingValues(20.dp),verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            item {
-                Text("Світло",style = MaterialTheme.typography.headlineMedium)
-                Text("Ваші адреси. Графіки Вінниччини.",color = colors.onSurfaceVariant,style = MaterialTheme.typography.bodyMedium)
-            }
-            item { LegendGuide() }
-            item { SettingsGroup("Попередження") {
-                PillExample()
-                Row(Modifier.fillMaxWidth(),horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("За 15 хв",style = MaterialTheme.typography.labelLarge)
-                    Text("Початок",style = MaterialTheme.typography.labelLarge)
-                    Text("Відновлення",style = MaterialTheme.typography.labelLarge)
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
+            Text("Світло",style=MaterialTheme.typography.headlineLarge)
+            Text("Ваші місця та графіки відключень.",color=colors.onSurfaceVariant)
+            SettingsGroup("Позначки") {
+                listOf(PowerState.SCHEDULED_OUTAGE,PowerState.NO_SCHEDULED_OUTAGE,PowerState.UNKNOWN).forEach { power ->
+                    Row(Modifier.fillMaxWidth().padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+                        PowerSwatch(power)
+                        Text(powerLabel(power),style=MaterialTheme.typography.bodyMedium)
+                    }
                 }
-                Text("Пігулка → зникає → звичайне сповіщення",style = MaterialTheme.typography.bodySmall,color = colors.onSurfaceVariant)
-                Text("План не підтверджує фактичного відновлення світла.",style = MaterialTheme.typography.bodySmall,color = colors.onSurfaceVariant)
-            } }
-            item { Disclosure("Віджет і екран блокування") {
-                Text("Утримуйте робочий стіл → Віджети → Світло.")
-                Text("Адреси та порядок налаштовуються окремо для кожного віджета.")
-                Text("Samsung AOD: Good Lock → LockStar, якщо підтримується пристроєм.",style = MaterialTheme.typography.bodySmall)
-            } }
-            item { Disclosure("Дані й оновлення") {
-                Text("Погодинний план завантажується з GitHub за чергою. Для Вінницької області можна додатково перевіряти адресу в офіційному журналі VOE, включно із селами. Дані не вимірюють напругу у вашому будинку.")
-                Text("Зазвичай перевіряємо раз на 30 хв, під час відключень — раз на 15 хв, а також на межах подій. Android може затримувати фонові задачі.",style = MaterialTheme.typography.bodySmall)
-                Text("Якщо дані прострочені — повторюємо перевірку автоматично. Помилка мережі не означає, що відключень немає.",style = MaterialTheme.typography.bodySmall)
-                state.syncStats?.let { Text("${it.succeeded} оновлень · ${it.failed} помилок",style = MaterialTheme.typography.labelMedium) }
-            } }
-            item { Disclosure("Що зберігається") {
-                Text("Місця, налаштування й історія — на цьому пристрої. План отримуємо з GitHub. Для ввімкненої перевірки адресних подій — з voe.com.ua. Адреса зіставляється локально, до VOE надсилається лише район.")
-                Text("«Я зараз тут» — ручний вибір місця, без GPS.",style = MaterialTheme.typography.bodySmall)
-            } }
-            item { TextButton(onClick = onAndroidSettings,modifier = Modifier.fillMaxWidth()) { Text("Сповіщення Android") } }
+            }
+            Text("План за чергою — з GitHub. Адресні події — з журналу оператора. Графік не вимірює напругу.",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+            TextButton(onClick=onAndroidSettings) { Text("Сповіщення Android") }
         }
     }
 }

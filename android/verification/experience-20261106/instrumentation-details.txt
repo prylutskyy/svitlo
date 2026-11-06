@@ -1,0 +1,8 @@
+
+ua.svitlo.app.SimplificationTest:...
+ua.svitlo.app.AppAppearanceSettingsTest:.
+ua.svitlo.app.DetailsRedesignTest:....
+
+Time: 30.274
+
+OK (8 tests)

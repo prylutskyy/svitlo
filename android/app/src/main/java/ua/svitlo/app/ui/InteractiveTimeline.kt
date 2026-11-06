@@ -125,7 +125,7 @@ private val LocalTimelineInteraction = staticCompositionLocalOf { TimelineIntera
                 if (span.state in OUTAGE_STATES) {
                     val brush = if (span.end > window.end) Brush.horizontalGradient(0f to ink,.85f to ink,1f to ink.copy(alpha = .12f),startX = a,endX = b)
                         else SolidColor(ink)
-                    drawLine(brush,Offset(a,y),Offset(b,y),thick)
+                    drawRoundRect(brush,Offset(a,y-thick/2),androidx.compose.ui.geometry.Size(b-a,thick),androidx.compose.ui.geometry.CornerRadius(thick/2,thick/2))
                 }
                 if (span.state == PowerState.UNKNOWN) {
                     var at = a

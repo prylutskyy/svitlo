@@ -1,0 +1,7 @@
+
+ua.svitlo.app.SimplificationTest:...
+ua.svitlo.app.QueueFeedUiTest:....
+
+Time: 44.855
+
+OK (7 tests)

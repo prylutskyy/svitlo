@@ -1,0 +1,8 @@
+
+ua.svitlo.app.SimplificationTest:...
+ua.svitlo.app.AppAppearanceSettingsTest:.
+ua.svitlo.app.NotificationRefreshDesignTest:..
+
+Time: 35.069
+
+OK (6 tests)

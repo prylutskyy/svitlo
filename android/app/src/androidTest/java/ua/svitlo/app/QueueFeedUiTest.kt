@@ -30,7 +30,7 @@ class QueueFeedUiTest {
   waitFor{option()!=null};var n=option()!!;while(!n.isClickable)n=n.parent
   assertTrue(n.performAction(AccessibilityNodeInfo.ACTION_CLICK));instrument.waitForIdleSync()
  }
- private fun screenshot(name:String) {val context=instrument.targetContext;instrument.uiAutomation.takeScreenshot().let{b->java.io.File(context.filesDir,name).outputStream().use{b.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}}}
+ private fun screenshot(name:String) {instrument.waitForIdleSync();Thread.sleep(300);val context=instrument.targetContext;instrument.uiAutomation.takeScreenshot().let{b->java.io.File(context.filesDir,name).outputStream().use{b.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}}}
  private fun scrollTo(tag:String) {
   repeat(10){if(find(tag)!=null)return;nodes().firstOrNull{it.isScrollable}?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);instrument.waitForIdleSync();Thread.sleep(100)}
   error("Missing $tag")
@@ -40,7 +40,7 @@ class QueueFeedUiTest {
   val saved=AtomicReference<String>()
   ActivityScenario.launch(MainActivity::class.java).use{scenario->
    scenario.onActivity{a->val vm=androidx.lifecycle.ViewModelProvider(a)[MainViewModel::class.java];a.setContent{SvitloTheme{QueueFeedPage(vm,null,{},loadGroups={listOf("GPV1.2","GPV7")},loadRegions={fail("Address lookup must be opt-in");emptyList()},save={p,g,_,_,_->saved.set("$p:$g")})}}}
-   click("queue-selector");choose("Черга 7");screenshot("official-queue.png");click("Зберегти");waitFor{saved.get()!=null}
+   click("queue-selector");choose("Черга 7");screenshot("official-queue.png");click("Далі");click("Зберегти");waitFor{saved.get()!=null}
    assertEquals("voe/Vinnytsiaoblenerho:GPV7",saved.get())
   }
  }
@@ -48,9 +48,9 @@ class QueueFeedUiTest {
   val saved=AtomicReference<ua.svitlo.app.domain.VoeIncidentAddress>()
   ActivityScenario.launch(MainActivity::class.java).use{scenario->
    scenario.onActivity{a->val vm=androidx.lifecycle.ViewModelProvider(a)[MainViewModel::class.java];a.setContent{SvitloTheme{QueueFeedPage(vm,null,{},loadGroups={listOf("GPV1.2")},loadRegions={listOf(ua.svitlo.app.domain.AddressItem("33","Погребищенський р-н"))},save={_,_,_,_,address->saved.set(address)})}}}
-   click("queue-selector");choose("Черга 1.2");click("incident-switch")
-   scrollTo("incident-region");click("incident-region");choose("Погребищенський р-н")
-   fill("incident-city","Гопчиця");fill("incident-street","вулиця Веселівка");fill("incident-house","1")
+   click("queue-selector");choose("Черга 1.2");click("Далі");screenshot("official-address-option.png");click("incident-switch");click("Далі")
+   scrollTo("incident-region");click("incident-region");choose("Погребищенський р-н");click("Далі")
+   fill("incident-city","Гопчиця");click("Далі");fill("incident-street","вулиця Веселівка");click("Далі");fill("incident-house","1")
    screenshot("official-gopchytsia.png");click("Зберегти");waitFor{saved.get()!=null}
    assertEquals("33",saved.get().regionId);assertEquals("Гопчиця",saved.get().city);assertEquals("1",saved.get().house)
   }
@@ -58,7 +58,7 @@ class QueueFeedUiTest {
  @Test fun failedQueueSourceCannotBeSaved() {
   ActivityScenario.launch(MainActivity::class.java).use{scenario->
    scenario.onActivity{a->val vm=androidx.lifecycle.ViewModelProvider(a)[MainViewModel::class.java];a.setContent{SvitloTheme{QueueFeedPage(vm,null,{},loadGroups={throw java.io.IOException("Джерело недоступне")},save={_,_,_,_,_->fail("Must not save")})}}}
-   waitFor{find("Джерело недоступне")!=null};var n=find("Зберегти")!!;while(!n.isClickable)n=n.parent;assertFalse(n.isEnabled)
+   waitFor{find("Джерело недоступне")!=null};var n=find("Далі")!!;while(!n.isClickable)n=n.parent;assertFalse(n.isEnabled)
   }
  }
  @Test fun largeTextKeepsSaveVisible() {
@@ -69,7 +69,7 @@ class QueueFeedUiTest {
      SvitloTheme{QueueFeedPage(vm,null,{},loadGroups={listOf("GPV1.2")},save={_,_,_,_,_->})}
     }
    }}
-   waitFor{find("Зберегти")!=null};screenshot("official-large-font.png")
+   waitFor{find("Далі")!=null};screenshot("official-large-font.png")
   }
  }
 }

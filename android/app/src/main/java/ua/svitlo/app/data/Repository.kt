@@ -41,7 +41,7 @@ class Repository(val store: StateStore, val api: VoeClient,
                     if (state.addresses.none { it == address }) state else {
                         val old = state.schedules.firstOrNull { it.addressId == id }
                         val changed = old == null || old.schedule.copy(fetchedAt = 0) != schedule.copy(fetchedAt = 0)
-                        val at = Instant.ofEpochMilli(schedule.fetchedAt)
+                        val at = clock()
                         val clear = !schedule.stale(at) && schedule.currentOutage == null && schedule.powerAt(at,at) == PowerState.NO_SCHEDULED_OUTAGE
                         RestorationPolicy.observe(state.copy(
                             historyTails = if (history == null) state.historyTails else state.historyTails.orEmpty().filterNot { it.addressId == id } + HistoryTail(id,history),
@@ -50,7 +50,7 @@ class Repository(val store: StateStore, val api: VoeClient,
                             attempts = state.attempts.filterNot { it.addressId == id } + FetchAttempt(id,if (address.feedId != null) clock().toEpochMilli() else schedule.fetchedAt,0,null),
                             observations = if (clear) state.observations?.filterNot { it.addressId == id } else state.observations,
                             syncStats = stats(state.syncStats,requestsBefore,bytesBefore,started,true),
-                            restorationNotifiedKey = RestorationPolicy.notificationKey(state,id,schedule) ?: state.restorationNotifiedKey), at)
+                            restorationNotifiedKey = RestorationPolicy.notificationKey(state,id,schedule,at) ?: state.restorationNotifiedKey), at)
                     }
                 }
             } catch (e: CancellationException) { throw e

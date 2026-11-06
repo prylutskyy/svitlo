@@ -29,19 +29,19 @@ class EventNotifications(private val context: Context) {
         val headline = when {
             event.emergency -> "Скоро аварійне відключення"
             event.possible -> "Вимкнення за графіком"
-            else -> "Скоро вимкнення"
+            else -> "Незабаром відключення"
         }
-        val timing = "Початок о $startTime"
+        val timing = "О $startTime · ${if(event.emergency) "аварійна подія" else "за графіком"}"
         val explanation = when {
             event.emergency -> "Аварійне повідомлення джерела"
             else -> "За графіком джерела"
         }
         // Native templates preserve promotion, accessibility and the system-owned countdown.
-        val accent = when { event.emergency -> Color.rgb(187,37,43); else -> Color.rgb(169,87,0) }
+        val accent = when { event.emergency -> Color.rgb(187,37,43); else -> Color.rgb(54,103,175) }
         val soundPrefs = context.getSharedPreferences("event-sounds", Context.MODE_PRIVATE)
         val alreadyAlerted = soundPrefs.getString("last-event", null) == event.key
         val builder = Notification.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_bolt_off)
-            .setContentTitle("${event.address.title} · $headline")
+            .setContentTitle(headline).setSubText(event.address.title)
             .setContentText(timing)
             .setStyle(Notification.BigTextStyle().bigText("$timing\n$explanation"))
             .setContentIntent(open).setOnlyAlertOnce(alreadyAlerted)

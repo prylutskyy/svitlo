@@ -66,18 +66,21 @@ class SvitloApp : Application() {
     private fun postRestoration(state: AppState) {
         if (!state.eventMonitoring) return
         val key = state.restorationNotifiedKey ?: return
+        if(!key.startsWith("${state.currentAddressId}:"))return
         val prefs = getSharedPreferences("restoration-notices", Context.MODE_PRIVATE)
         if (prefs.getString("posted", null) == key) return
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
         val manager = getSystemService(NotificationManager::class.java)
         NotificationSounds.createChannels(this)
         val title = state.addresses.firstOrNull { it.id == state.currentAddressId }?.title ?: "Поточне місце"
+        val planned = key.endsWith(":plan-ended")
+        val message = if (planned) "Плановий інтервал завершився" else "Оператор більше не повідомляє про відключення"
         val open = PendingIntent.getActivity(this, 32, Intent(this, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         manager.notify("restoration", 3, Notification.Builder(this, NotificationSounds.RESTORATION)
             .setSmallIcon(R.drawable.ic_bolt).setColor(Color.rgb(48,142,107))
-            .setContentTitle("$title · Відключення знято")
-            .setContentText("За даними джерела · перевірте живлення")
-            .setStyle(Notification.BigTextStyle().bigText("Джерело більше не позначає відключення. Перевірте живлення на місці."))
+            .setContentTitle(if (planned) "Світло за графіком" else "Відключення знято").setSubText(title)
+            .setContentText(message)
+            .setStyle(Notification.BigTextStyle().bigText("$message. Фактична наявність напруги не вимірюється."))
             .setContentIntent(open).setAutoCancel(true).setOnlyAlertOnce(false).build())
         prefs.edit().putString("posted", key).apply()
     }

@@ -85,7 +85,7 @@ class NotificationRefreshDesignTest {
             EventNotifications(context).render(state,now)
             await { manager.activeNotifications.any { it.tag == EventNotifications.TAG } }
             val event = manager.activeNotifications.single { it.tag == EventNotifications.TAG }.notification
-            assertEquals("Дім · Скоро вимкнення",event.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+            assertEquals("Незабаром відключення",event.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
             assertTrue(event.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString().split('\n').size <= 2)
             assertNull(event.getLargeIcon()); assertNull(event.bigContentView)
             assertEquals(R.drawable.ic_bolt_off,event.smallIcon.resId)
@@ -126,13 +126,13 @@ class NotificationRefreshDesignTest {
             assertEquals("Відключень не позначено",calm.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
             shell("cmd statusbar expand-notifications"); Thread.sleep(1000); shot("calm")
             shell("cmd statusbar collapse")
-            val restored = clear.copy(eventMonitoring = true,restorationNotifiedKey = "notification-ui-fixture:${System.nanoTime()}")
+            val restored = clear.copy(eventMonitoring = true,restorationNotifiedKey = "${clear.currentAddressId}:${System.nanoTime()}")
             context.app.store.update { restored }
             context.app.publish()
             await { manager.activeNotifications.any { it.tag == "restoration" } }
             val restoration = manager.activeNotifications.single { it.tag == "restoration" }.notification
-            assertEquals("Дім · Відключення знято",restoration.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
-            assertTrue(restoration.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("VOE"))
+            assertEquals("Відключення знято",restoration.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+            assertTrue(restoration.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Оператор"))
             shell("cmd statusbar expand-notifications"); Thread.sleep(1000); shot("restoration")
         } finally {
             shell("cmd statusbar collapse"); manager.cancel(EventNotifications.TAG,EventNotifications.ID); manager.cancel(TrackingNotifications.TAG,TrackingNotifications.ID)

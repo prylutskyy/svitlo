@@ -228,38 +228,63 @@ private fun Modifier.scrollThumb(scroll: ScrollState,color: Color) = drawWithCon
         catch(e:CancellationException){throw e}
         catch(e:Exception){regionError=e.message ?: "Журнал VOE недоступний"}
     }
-    FullScreenPage(if(existing==null)"Нове місце" else "Джерело та аварії",onBack=onDismiss) {
+    var step by rememberSaveable(existing?.id) { mutableIntStateOf(0) }
+    val supportsAddress = providerId=="voe/Vinnytsiaoblenerho"
+    val total = if(!supportsAddress) 1 else if(enabled) 6 else 2
+    val last = if(!supportsAddress) true else if(!enabled) step==1 else step==5
+    val canContinue = !saving && !loading && group in groups && when(step) {
+        2 -> region in regions.map{it.id} && regionError==null
+        3 -> city.isNotBlank()
+        4 -> street.isNotBlank()
+        5 -> house.isNotBlank()
+        else -> true
+    }
+    LaunchedEffect(step) { scroll.scrollTo(0) }
+    FullScreenPage(if(existing==null)"Нове місце" else "Джерело та аварії",onBack={if(step>0)step-- else onDismiss()}) {
         Column(Modifier.fillMaxSize().imePadding().semantics{testTagsAsResourceId=true}) {
+            Row(Modifier.fillMaxWidth().padding(horizontal=24.dp,vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                repeat(total) { index ->
+                    Surface(Modifier.weight(1f).height(4.dp),shape=MaterialTheme.shapes.small,
+                        color=if(index<=step)colors.primary else colors.surfaceContainerHighest) {}
+                }
+            }
             Column(Modifier.weight(1f).fillMaxWidth().scrollThumb(scroll,colors.onSurfaceVariant).verticalScroll(scroll).padding(24.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-                Text("Погодинний графік",style=MaterialTheme.typography.headlineSmall)
-                SourceSelect("Область та оператор",FeedProviders.get(providerId).label,providerId,"Оберіть оператора",!saving,"provider-selector",FeedProviders.all.map{it.id to it.label}){providerId=it;group="";enabled=false}
-                SourceSelect("Черга",group.removePrefix("GPV"),group,"Оберіть чергу",!loading && !saving,"queue-selector",groups.map{it to "Черга ${it.removePrefix("GPV")}"}){group=it;error=null}
-                if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                if(providerId=="voe/Vinnytsiaoblenerho") {
-                    Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)){Text("Перевіряти адресні відключення",style=MaterialTheme.typography.titleMedium);Text("Офіційний журнал Вінницяобленерго",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)}
-                        Switch(enabled,{enabled=it;error=null},enabled=!saving,modifier=Modifier.testTag("incident-switch"))
+                Text(when(step) {0->"Погодинний графік";1->"Додати адресу?";2->"Район";3->"Населений пункт";4->"Вулиця";else->"Будинок"},style=MaterialTheme.typography.headlineSmall)
+                when(step) {
+                    0 -> {
+                        SourceSelect("Область та оператор",FeedProviders.get(providerId).label,providerId,"Оберіть оператора",!saving,"provider-selector",FeedProviders.all.map{it.id to it.label}){providerId=it;group="";enabled=false}
+                        SourceSelect("Черга",group.removePrefix("GPV"),group,"Оберіть чергу",!loading && !saving,"queue-selector",groups.map{it to "Черга ${it.removePrefix("GPV")}"}){group=it;error=null}
+                        if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                        if(existing==null)OutlinedTextField(title,{title=it.take(60)},label={Text("Назва · необов’язково")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("place-name"))
                     }
-                    if(enabled) {
-                        Text("Черга задає план. Для аварій та інших адресних подій потрібен будинок; перевірка охоплює також села області.",style=MaterialTheme.typography.bodySmall)
+                    1 -> {
+                        Text("Черга вже задає план. Адреса потрібна для додаткової перевірки подій у журналі Вінницяобленерго.",color=colors.onSurfaceVariant)
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                            Text("Перевіряти адресні відключення",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
+                            Switch(enabled,{enabled=it;error=null},enabled=!saving,modifier=Modifier.testTag("incident-switch"))
+                        }
+                        Text("Журнал може бути неповним. Відсутність повідомлень не підтверджує наявність світла.",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                    }
+                    2 -> {
                         SourceSelect("Район у журналі VOE",regions.firstOrNull{it.id==region}?.name.orEmpty(),region,"Оберіть район",!saving && regions.isNotEmpty(),"incident-region",regions.map{it.id to it.name}){region=it;error=null}
-                        OutlinedTextField(city,{city=it.take(100);error=null},label={Text("Населений пункт")},placeholder={Text("Наприклад, Гопчиця")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("incident-city"))
-                        OutlinedTextField(street,{street=it.take(120);error=null},label={Text("Вулиця / провулок")},placeholder={Text("Наприклад, вулиця Центральна")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("incident-street"))
-                        OutlinedTextField(house,{house=it.take(30);error=null},label={Text("Будинок")},placeholder={Text("Наприклад, 12 або 81/2")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("incident-house"))
-                        Text("Оберіть структурний район зі списку VOE; він може мати стару назву. Назви вулиць вказуйте разом із типом: вулиця, провулок, проспект.",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                        if(regions.isEmpty() && regionError==null)LinearProgressIndicator(Modifier.fillMaxWidth())
+                        Text("У журналі можуть залишатися старі назви районів.",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
                     }
-                } else Text("Для цього оператора поки доступний лише графік за чергою.",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
-                (error ?: if(enabled) regionError else null)?.let{message->Surface(color=colors.errorContainer,shape=MaterialTheme.shapes.medium){Column(Modifier.padding(16.dp)){Text(message);TextButton(onClick={retry++}){Text("Повторити")}}}}
-                if(existing==null)OutlinedTextField(title,{title=it.take(60)},label={Text("Назва · необов’язково")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("place-name"))
-                Text("Час завершення подій може бути орієнтовним. Відсутність повідомлень не підтверджує наявність напруги.",style=MaterialTheme.typography.bodySmall,color=colors.onSurfaceVariant)
+                    3 -> OutlinedTextField(city,{city=it.take(100);error=null},label={Text("Населений пункт")},placeholder={Text("Наприклад, Гопчиця")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("incident-city"))
+                    4 -> OutlinedTextField(street,{street=it.take(120);error=null},label={Text("Вулиця / провулок")},placeholder={Text("Наприклад, вулиця Центральна")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("incident-street"))
+                    5 -> OutlinedTextField(house,{house=it.take(30);error=null},label={Text("Будинок")},placeholder={Text("Наприклад, 12 або 81/2")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("incident-house"))
+                }
+                (error ?: if(step>=2)regionError else null)?.let{message->Surface(color=colors.errorContainer,shape=MaterialTheme.shapes.medium){Column(Modifier.padding(16.dp)){Text(message);TextButton(onClick={retry++}){Text("Повторити")}}}}
             }
             HorizontalDivider()
-            Button(onClick={scope.launch{saving=true;error=null;try{
-                val address=if(enabled)ua.svitlo.app.domain.VoeIncidentAddress(region,city.trim(),street.trim(),house.trim()) else null
-                save(providerId,group,title,existing?.id,address);onDismiss()
-            }catch(e:CancellationException){throw e}catch(e:Exception){error=e.message ?: "Не вдалося зберегти";scroll.animateScrollTo(scroll.maxValue)}finally{saving=false}}},
-                enabled=!saving && !loading && group in groups && (!enabled || (region in regions.map{it.id} && city.isNotBlank() && street.isNotBlank() && house.isNotBlank() && regionError==null)),
-                modifier=Modifier.fillMaxWidth().padding(24.dp).heightIn(min=56.dp)){Text(if(saving)"Зберігаємо…" else "Зберегти")}
+            Button(onClick={
+                if(!last) {step++;error=null} else scope.launch{saving=true;error=null;try{
+                    val address=if(enabled && supportsAddress)ua.svitlo.app.domain.VoeIncidentAddress(region,city.trim(),street.trim(),house.trim()) else null
+                    save(providerId,group,title,existing?.id,address);onDismiss()
+                }catch(e:CancellationException){throw e}catch(e:Exception){error=e.message ?: "Не вдалося зберегти";scroll.animateScrollTo(scroll.maxValue)}finally{saving=false}}
+            }, enabled=canContinue,modifier=Modifier.fillMaxWidth().padding(24.dp).heightIn(min=56.dp)) {
+                Text(if(saving)"Зберігаємо…" else if(last)"Зберегти" else "Далі")
+            }
         }
     }
 }

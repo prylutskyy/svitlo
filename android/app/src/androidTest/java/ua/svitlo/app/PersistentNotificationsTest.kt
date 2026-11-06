@@ -51,9 +51,9 @@ class PersistentNotificationsTest {
             val notification = manager.activeNotifications.single { it.tag == EventNotifications.TAG }.notification
             assertEquals(R.drawable.ic_bolt_off, notification.smallIcon.resId)
             assertNull(notification.getLargeIcon())
-            assertEquals("Дім · Скоро вимкнення", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
-            assertTrue(notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString().startsWith("Початок о "))
-            assertTrue(notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString().contains("VOE"))
+            assertEquals("Незабаром відключення", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+            assertTrue(notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString().startsWith("О "))
+            assertTrue(notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString().contains("графіком"))
             assertTrue(notification.extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN))
             if (Build.VERSION.SDK_INT >= 36) assertTrue(notification.hasPromotableCharacteristics())
             fun shell(command: String) = ui.executeShellCommand(command).use {
@@ -148,9 +148,9 @@ class PersistentNotificationsTest {
                 waitFor { event() != null }
                 val notification = event()!!.notification
                 assertEquals(R.drawable.ic_bolt_off, notification.smallIcon.resId)
-                assertEquals("Дім · Скоро вимкнення", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
-                assertTrue(notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString().startsWith("Початок о "))
-                assertTrue(notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString().contains("VOE"))
+                assertEquals("Незабаром відключення", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+                assertTrue(notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString().startsWith("О "))
+                assertTrue(notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString().contains("графіком"))
                 assertTrue(notification.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER))
                 assertTrue(notification.extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN))
                 assertNull(notification.bigContentView)
