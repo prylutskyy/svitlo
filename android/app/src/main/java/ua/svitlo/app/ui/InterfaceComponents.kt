@@ -101,9 +101,10 @@ internal fun powerLabel(state: PowerState) = when (state) {
 }
 
 /** One interaction model on the home screen and in address details. */
-@Composable internal fun AddressTimeline(chart: NotificationChart, schedule: Schedule? = null, history: List<HistoryInterval> = emptyList()) {
+@Composable internal fun AddressTimeline(chart: NotificationChart, schedule: Schedule? = null, history: List<HistoryInterval> = emptyList(),
+    footer: @Composable () -> Unit = {}) {
     val window = TimelineWindow(chart.start,chart.end)
     val source = if (schedule != null) PowerHistory.overlay(schedule.inspectionSpans(window,chart.now),history,chart.now)
         else chart.rows.firstOrNull()?.spans.orEmpty()
-    InteractiveTimeline(TimelineNavigation.coalesced(source),window,chart.now)
+    InteractiveTimeline(TimelineNavigation.coalesced(source),window,chart.now,footer)
 }

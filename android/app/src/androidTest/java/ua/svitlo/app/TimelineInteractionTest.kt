@@ -97,6 +97,9 @@ class TimelineInteractionTest {
                         Button(onClick = { clicked = true }) { Text(if (clicked) "Дія виконана" else "Інша дія") }
                     } }
                 } } } }
+                // Wait for the new page, not the previous iteration's still-visible canvas.
+                waitFor { node(if (details) "Деталі графіка" else "Графік локації") != null }
+                instrument.waitForIdleSync()
                 waitFor { nodes().any { it.contentDescription?.startsWith("Часова шкала.") == true } }
                 val canvas = nodes().first { it.contentDescription?.startsWith("Часова шкала.") == true }
                 tap(canvas,.75f) // 17:00 Kyiv within the published 16:00–18:00 event.

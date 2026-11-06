@@ -29,7 +29,7 @@ import ua.svitlo.app.domain.*
                     Text("Відновлення",style = MaterialTheme.typography.labelLarge)
                 }
                 Text("Пігулка → зникає → звичайне сповіщення",style = MaterialTheme.typography.bodySmall,color = colors.onSurfaceVariant)
-                Text("Про відновлення — після свіжого підтвердження VOE.",style = MaterialTheme.typography.bodySmall,color = colors.onSurfaceVariant)
+                Text("План не підтверджує фактичного відновлення світла.",style = MaterialTheme.typography.bodySmall,color = colors.onSurfaceVariant)
             } }
             item { Disclosure("Віджет і екран блокування") {
                 Text("Утримуйте робочий стіл → Віджети → Світло.")
@@ -37,14 +37,14 @@ import ua.svitlo.app.domain.*
                 Text("Samsung AOD: Good Lock → LockStar, якщо підтримується пристроєм.",style = MaterialTheme.typography.bodySmall)
             } }
             item { Disclosure("Дані й оновлення") {
-                Text("Джерело — Вінницяобленерго. Графік не вимірює напругу у вашому будинку.")
+                Text("Погодинний план завантажується з GitHub за чергою. Для Вінницької області можна додатково перевіряти адресу в офіційному журналі VOE, включно із селами. Дані не вимірюють напругу у вашому будинку.")
                 Text("Зазвичай перевіряємо раз на 30 хв, під час відключень — раз на 15 хв, а також на межах подій. Android може затримувати фонові задачі.",style = MaterialTheme.typography.bodySmall)
                 Text("Якщо дані прострочені — повторюємо перевірку автоматично. Помилка мережі не означає, що відключень немає.",style = MaterialTheme.typography.bodySmall)
-                state.syncStats?.let { Text("${it.requests} запитів · ${it.receivedBytes/1024} КБ · ${it.failed} помилок",style = MaterialTheme.typography.labelMedium) }
+                state.syncStats?.let { Text("${it.succeeded} оновлень · ${it.failed} помилок",style = MaterialTheme.typography.labelMedium) }
             } }
             item { Disclosure("Що зберігається") {
-                Text("Адреси, налаштування й історія — на цьому пристрої. Запити надсилаються прямо до VOE.")
-                Text("«Я зараз тут» — ручний вибір адреси, без GPS.",style = MaterialTheme.typography.bodySmall)
+                Text("Місця, налаштування й історія — на цьому пристрої. План отримуємо з GitHub. Для ввімкненої перевірки адресних подій — з voe.com.ua. Адреса зіставляється локально, до VOE надсилається лише район.")
+                Text("«Я зараз тут» — ручний вибір місця, без GPS.",style = MaterialTheme.typography.bodySmall)
             } }
             item { TextButton(onClick = onAndroidSettings,modifier = Modifier.fillMaxWidth()) { Text("Сповіщення Android") } }
         }
@@ -53,24 +53,21 @@ import ua.svitlo.app.domain.*
 
 @Composable internal fun LegendGuide() {
     var selected by rememberSaveable { mutableIntStateOf(0) }
-    val states = listOf(PowerState.SCHEDULED_OUTAGE,PowerState.CONFIRMED_OUTAGE,PowerState.EMERGENCY_OUTAGE,
-        PowerState.NO_SCHEDULED_OUTAGE,PowerState.UNKNOWN)
+    val states = listOf(PowerState.SCHEDULED_OUTAGE,PowerState.NO_SCHEDULED_OUTAGE,PowerState.UNKNOWN)
     SettingsGroup("Як читати графік") {
         states.forEachIndexed { index,state ->
             Surface(onClick = { selected = index },shape = MaterialTheme.shapes.medium,
-                color = if (selected == index) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerLow) {
+                color = if (selected.coerceIn(states.indices) == index) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerLow) {
                 Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 12.dp),verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     PowerSwatch(state)
                     Text(powerLabel(state),Modifier.weight(1f),style = MaterialTheme.typography.bodyMedium)
-                    if (selected == index) Icon(SvitloIcons.Check,null,Modifier.size(18.dp))
+                    if (selected.coerceIn(states.indices) == index) Icon(SvitloIcons.Check,null,Modifier.size(18.dp))
                 }
             }
         }
-        Text(when (states[selected]) {
+        Text(when (states[selected.coerceIn(states.indices)]) {
             PowerState.SCHEDULED_OUTAGE -> "Опублікований інтервал ГПВ. Це план, а не повідомлення про фактичну відсутність напруги."
-            PowerState.CONFIRMED_OUTAGE -> "Адресне повідомлення VOE про відключення."
-            PowerState.EMERGENCY_OUTAGE -> "Аварія. Час відновлення орієнтовний."
             PowerState.NO_SCHEDULED_OUTAGE -> "У відомому графіку немає відключень."
             else -> "Немає свіжих даних для цих годин."
         },style = MaterialTheme.typography.bodySmall,color = MaterialTheme.colorScheme.onSurfaceVariant)

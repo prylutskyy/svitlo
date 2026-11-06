@@ -15,8 +15,8 @@ class RefreshPolicyTest {
         currentAddressId = home.id, schedules = listOf(CachedSchedule(home.id,schedule)),
         attempts = listOf(FetchAttempt(home.id,schedule.fetchedAt,0,null)))
 
-    @Test fun `quiet address waits thirty minutes while active address waits fifteen`() {
-        assertEquals(at.plusSeconds(1800), RefreshPolicy.nextDue(state(),home.id,at))
+    @Test fun `quiet and active addresses both check every fifteen minutes`() {
+        assertEquals(at.plusSeconds(900), RefreshPolicy.nextDue(state(),home.id,at))
         assertEquals(at.plusSeconds(900), RefreshPolicy.nextDue(state(schedule(700,900)),home.id,at))
     }
     @Test fun `predicted end is due even one second after the previous successful check`() {
@@ -42,10 +42,11 @@ class RefreshPolicyTest {
         val updated = state(schedule(800,900,fetched = warning)).copy(eventMonitoring = true)
         assertEquals(at.plusSeconds(1200),RefreshPolicy.nextDue(updated,home.id,warning))
     }
-    @Test fun `local quarter hour drawing cannot force a quiet network query`() {
+    @Test fun `drawing cannot force a quiet network query before its deadline`() {
         val value = state()
         assertEquals(at.plusSeconds(900),EnergyPolicy.nextBoundary(value,at))
-        assertFalse(RefreshPolicy.due(value,home.id,at.plusSeconds(900)))
+        assertFalse(RefreshPolicy.due(value,home.id,at.plusSeconds(300)))
+        assertTrue(RefreshPolicy.due(value,home.id,at.plusSeconds(900)))
     }
     @Test fun `an extension does not create a restore event and schedules the new end`() {
         val oldEnd = at.plusSeconds(60)
@@ -64,18 +65,32 @@ class RefreshPolicyTest {
         val active = state(schedule(700,900))
         assertEquals(Duration.ofMinutes(15),RefreshPolicy.interval(active,home.id,at,true))
         assertEquals(Duration.ofMinutes(30),RefreshPolicy.interval(active.copy(currentAddressId=null),home.id,at,true))
-        assertEquals(Duration.ofMinutes(60),RefreshPolicy.interval(state().copy(currentAddressId=null),home.id,at,true))
+        assertEquals(Duration.ofMinutes(30),RefreshPolicy.interval(state().copy(currentAddressId=null),home.id,at,true))
     }
-    @Test fun `open screen uses five minutes and manual refresh has sixty second floor`() {
-        assertEquals(at.plusSeconds(300),RefreshPolicy.nextDue(state(),home.id,at,RefreshMode.FOREGROUND))
-        assertFalse(RefreshPolicy.due(state(),home.id,at.plusSeconds(59),RefreshMode.MANUAL))
-        assertTrue(RefreshPolicy.due(state(),home.id,at.plusSeconds(60),RefreshMode.MANUAL))
+    @Test fun `open screen checks every minute and manual refresh has five second floor`() {
+        assertEquals(at.plusSeconds(60),RefreshPolicy.nextDue(state(),home.id,at,RefreshMode.FOREGROUND))
+        assertFalse(RefreshPolicy.due(state(),home.id,at.plusSeconds(59),RefreshMode.FOREGROUND))
+        assertTrue(RefreshPolicy.due(state(),home.id,at.plusSeconds(60),RefreshMode.FOREGROUND))
+        assertFalse(RefreshPolicy.due(state(),home.id,at.plusSeconds(4),RefreshMode.MANUAL))
+        assertTrue(RefreshPolicy.due(state(),home.id,at.plusSeconds(5),RefreshMode.MANUAL))
     }
     @Test fun `shared retry after protects every address including manual refresh`() {
         val retry = at.plusSeconds(1200)
         val value = state().copy(attempts = listOf(FetchAttempt("other",at.toEpochMilli(),1,"429",FetchFailure.RATE_LIMIT,retry.toEpochMilli())))
         assertEquals(retry,RefreshPolicy.nextDue(value,home.id,at,RefreshMode.MANUAL))
         assertEquals(retry,RefreshPolicy.nextDue(value,home.id,at))
+    }
+    @Test fun `rate limit without retry after also protects manual refresh`() {
+        val value = state().copy(attempts = listOf(FetchAttempt(home.id,at.toEpochMilli(),1,"429",FetchFailure.RATE_LIMIT)))
+        assertEquals(at.plusSeconds(1800),RefreshPolicy.nextDue(value,home.id,at.plusSeconds(5),RefreshMode.MANUAL))
+    }
+    @Test fun `opening bypasses foreground minute interval but deduplicates rapid resumes`() {
+        assertFalse(RefreshPolicy.due(state(),home.id,at.plusSeconds(4),RefreshMode.OPENED))
+        assertTrue(RefreshPolicy.due(state(),home.id,at.plusSeconds(5),RefreshMode.OPENED))
+        assertFalse(RefreshPolicy.due(state(),home.id,at.plusSeconds(5),RefreshMode.FOREGROUND))
+        val retry=at.plusSeconds(900)
+        val limited=state().copy(attempts=listOf(FetchAttempt(home.id,at.toEpochMilli(),1,"429",FetchFailure.RATE_LIMIT,retry.toEpochMilli())))
+        assertEquals(retry,RefreshPolicy.nextDue(limited,home.id,at.plusSeconds(5),RefreshMode.OPENED))
     }
     @Test fun `critical network error backs off five minutes and reconnect is bounded`() {
         val value = state(schedule(700,900)).copy(attempts = listOf(FetchAttempt(home.id,at.toEpochMilli(),1,"offline",FetchFailure.NETWORK)))

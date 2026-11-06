@@ -21,7 +21,7 @@ object RestorationPolicy {
     }
 
     fun notificationKey(state: AppState, addressId: String, latest: Schedule): String? {
-        if (!state.eventMonitoring || addressId != state.currentAddressId) return null
+        if (latest.sourceUrl != null || !state.eventMonitoring || addressId != state.currentAddressId) return null
         val previous = state.schedule(addressId) ?: return null
         val at = Instant.ofEpochMilli(latest.fetchedAt)
         val observation = state.observations.orEmpty().firstOrNull { it.addressId == addressId }

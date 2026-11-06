@@ -27,7 +27,7 @@ class DeviceSmokeTest {
         val services = context.app
         val address = SavedAddress("510100000:1652:26590", "Тест · Соборна, 1", AddressItem("510100000", "Вінниця"),
             AddressItem("1652", "Соборна"), AddressItem("26590", "1"))
-        val schedule = VoeClient().Batch().schedule(address)
+        val schedule = VoeClient().Batch().schedule(address.copy(feedId="voe/Vinnytsiaoblenerho",feedGroup="GPV1.2"))
         assertTrue("Expected a live VOE day", schedule.days.isNotEmpty())
         assertTrue(schedule.days.all { it.slots.size == 48 })
         val original = services.store.load()

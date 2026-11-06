@@ -20,7 +20,7 @@ data class FocusEvent(val key: String, val address: SavedAddress, val title: Str
             val possible = span.state == PowerState.POSSIBLE_OUTAGE
             return FocusEvent("${address.id}:slot:${span.end.toEpochMilli()}:${span.state}", address,
                 when { possible -> "Вимкнення за графіком"; span.state == PowerState.SCHEDULED_OUTAGE -> "За графіком"; span.state == PowerState.EMERGENCY_OUTAGE -> "Аварійне вимкнення"; else -> "Вимкнення за графіком" },
-                when { possible -> "За графіком VOE"; span.state == PowerState.SCHEDULED_OUTAGE -> "За графіком VOE"; span.state == PowerState.EMERGENCY_OUTAGE -> "Аварійна подія VOE"; else -> "За плановим графіком" },
+                when { possible -> "За графіком джерела"; span.state == PowerState.SCHEDULED_OUTAGE -> "За графіком джерела"; span.state == PowerState.EMERGENCY_OUTAGE -> "Аварійна подія джерела"; else -> "За плановим графіком" },
                 span.start, upcoming, span.state == PowerState.EMERGENCY_OUTAGE, possible)
         }
         fun nextBoundaries(state: AppState, now: Instant): List<Instant> {

@@ -21,6 +21,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.unit.dp
@@ -41,6 +44,7 @@ fun SvitloScreen(onNotificationSettings: () -> Unit, vm: MainViewModel = viewMod
     val state by vm.state.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    var feedAddressId by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var now by remember { mutableStateOf(Instant.now()) }
@@ -52,11 +56,6 @@ fun SvitloScreen(onNotificationSettings: () -> Unit, vm: MainViewModel = viewMod
     var adding by rememberSaveable { mutableStateOf(false) }
     var detailsAddressId by rememberSaveable { mutableStateOf<String?>(null) }
     var historyAddressId by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(lifecycle, vm) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) { vm.refreshVisible(); delay(5 * 60_000L) }
-        }
-    }
     var moreMenu by remember { mutableStateOf(false) }
     var appearanceSettings by rememberSaveable { mutableStateOf(false) }
     var info by rememberSaveable { mutableStateOf(false) }
@@ -82,6 +81,8 @@ fun SvitloScreen(onNotificationSettings: () -> Unit, vm: MainViewModel = viewMod
     val homeState = rememberSaveableStateHolder()
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); vm.message.value = null } }
     val fullPageOpen = appearanceSettings || notificationSettings || info || adding || historyAddressId != null || detailsAddressId != null
+    val homeColors = MaterialTheme.colorScheme
+    val homeBackground = if (homeColors.surface.luminance() < .5f) homeColors.surface else homeColors.surfaceContainerLow
     Box(Modifier.fillMaxSize()) {
     // Keep the actual preceding screen alive for predictive back, but hide its accessibility tree.
     Box(Modifier.fillMaxSize().then(if (fullPageOpen) Modifier.clearAndSetSemantics { }.pointerInput(Unit) {
@@ -90,13 +91,12 @@ fun SvitloScreen(onNotificationSettings: () -> Unit, vm: MainViewModel = viewMod
         }
     } else Modifier)) {
     homeState.SaveableStateProvider("home") { Scaffold(
+        containerColor = homeBackground,
         topBar = {
-            TopAppBar(title = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = homeBackground,scrolledContainerColor = homeBackground),title = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(SvitloIcons.Bolt, null, tint = MaterialTheme.colorScheme.primary)
                 Text("Світло", style = MaterialTheme.typography.titleLarge)
             } }, actions = {
-                if (busy) LoadingIndicator(Modifier.size(44.dp))
-                else IconButton(onClick = vm::refresh, enabled = state.addresses.isNotEmpty()) { Icon(SvitloIcons.Refresh, "Оновити графіки") }
                 IconButton(onClick = { notificationSettings = true }, enabled = state.addresses.isNotEmpty()) { Icon(SvitloIcons.Notifications, "Сповіщення") }
                 Box {
                     IconButton(onClick = { moreMenu = true }) { Icon(SvitloIcons.More, "Інші дії") }
@@ -111,7 +111,10 @@ fun SvitloScreen(onNotificationSettings: () -> Unit, vm: MainViewModel = viewMod
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+        HomeRefreshContainer(refreshing = busy,onRefresh = { if (state.addresses.isNotEmpty()) vm.refresh() },
+            modifier = Modifier.fillMaxSize().padding(padding).semantics {
+                if (state.addresses.isNotEmpty()) customActions = listOf(CustomAccessibilityAction("Оновити графіки") { vm.refresh();true })
+            }) {
             LazyColumn(Modifier.fillMaxSize().widthIn(max = 720.dp), contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (state.graphDismissed && state.graphsEnabled(now)) item {
@@ -124,11 +127,11 @@ fun SvitloScreen(onNotificationSettings: () -> Unit, vm: MainViewModel = viewMod
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("Поточне місце", style = MaterialTheme.typography.titleMedium)
-                            if (focused == null) Text("Виберіть адресу для попереджень", style = MaterialTheme.typography.bodySmall,
+                            if (focused == null) Text("Виберіть місце для попереджень", style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         TextButton(onClick = { choosingPlace = true }) { Text(if (focused == null) "Вибрати" else "Змінити") }
-                        if (focused != null && state.addresses.size == 1) IconButton(onClick = { adding = true }) { Icon(SvitloIcons.Add, "Додати адресу") }
+                        if (focused != null && state.addresses.size == 1) IconButton(onClick = { adding = true }) { Icon(SvitloIcons.Add, "Додати місце") }
                     }
                 }
                 if (focused != null) item(key = "current:${focused.id}") {
@@ -141,19 +144,19 @@ fun SvitloScreen(onNotificationSettings: () -> Unit, vm: MainViewModel = viewMod
                 }
                 if (state.addresses.isNotEmpty() && (focused == null || state.addresses.size > 1)) item {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (focused == null) "Ваші адреси" else "Інші адреси", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                        FilledTonalIconButton(onClick = { adding = true }, modifier = Modifier.size(48.dp)) { Icon(SvitloIcons.Add, "Додати адресу") }
+                        Text(if (focused == null) "Ваші місця" else "Інші місця", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                        FilledTonalIconButton(onClick = { adding = true }, modifier = Modifier.size(48.dp)) { Icon(SvitloIcons.Add, "Додати місце") }
                     }
                 }
                 if (state.addresses.isEmpty()) item {
                     Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.extraLarge) {
                         Column(Modifier.fillMaxWidth().padding(28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             Icon(SvitloIcons.Home, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                            Text("Ваші адреси\nв одному місці", style = MaterialTheme.typography.headlineLarge)
-                            Text("Додайте адресу — графік і аварійні відключення будуть під рукою.")
+                            Text("Ваші місця\nв одному місці", style = MaterialTheme.typography.headlineLarge)
+                            Text("Виберіть оператора та свою чергу відключень.")
                             Button(onClick = { adding = true }, shapes = ButtonDefaults.shapes(),
                                 modifier = Modifier.heightIn(min = 56.dp)) {
-                                Icon(SvitloIcons.Add, null); Spacer(Modifier.width(8.dp)); Text("Додати адресу")
+                                Icon(SvitloIcons.Add, null); Spacer(Modifier.width(8.dp)); Text("Додати місце")
                             }
                         }
                     }
@@ -177,7 +180,8 @@ fun SvitloScreen(onNotificationSettings: () -> Unit, vm: MainViewModel = viewMod
     state.addresses.firstOrNull { it.id == detailsAddressId }?.let { address ->
         AddressDetailsPage(address,state.schedule(address.id),state.attempt(address.id),now,
             state.schedules.firstOrNull { it.addressId == address.id }?.changedAt,
-            onBack = { detailsAddressId = null },onHistory = { historyAddressId = address.id })
+            onBack = { detailsAddressId = null },onHistory = { historyAddressId = address.id },onFeed = { feedAddressId = address.id },
+            onRename={vm.rename(address.id,it)},refreshing=busy,onRefresh=vm::refresh)
     }
     state.addresses.firstOrNull { it.id == historyAddressId }?.let { address ->
         HistoryPage(address,state.schedule(address.id),now,onDismiss = { historyAddressId = null })
@@ -185,7 +189,7 @@ fun SvitloScreen(onNotificationSettings: () -> Unit, vm: MainViewModel = viewMod
     if (choosingPlace) ScrollableSheet(onDismissRequest = { choosingPlace = false }) { close ->
         Column(Modifier.fillMaxWidth().heightIn(max = sheetMaxHeight)) {
             Text("Де ви зараз?", Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp), style = MaterialTheme.typography.headlineSmall)
-            Text("Попереджати про відключення за цією адресою.",
+            Text("Попереджати про заплановані відключення.",
                 Modifier.padding(horizontal = 24.dp, vertical = 8.dp), style = MaterialTheme.typography.bodyMedium)
             LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
@@ -208,27 +212,31 @@ fun SvitloScreen(onNotificationSettings: () -> Unit, vm: MainViewModel = viewMod
     if (notificationSettings) FullScreenPage("Сповіщення",onBack = { notificationSettings = false }) {
         LazyColumn(Modifier.fillMaxSize(),contentPadding = PaddingValues(20.dp),verticalArrangement = Arrangement.spacedBy(20.dp)) {
             item { SettingsGroup("На екрані блокування") {
-                SettingSwitch("Графіки адрес",state.graphsEnabled(now),
-                    { if (it) request("graphs") else vm.hideGraphs() },"$selected адрес · без обмеження часу",
+                SettingSwitch("Графіки місць",state.graphsEnabled(now),
+                    { if (it) request("graphs") else vm.hideGraphs() },"$selected місць · без обмеження часу",
                     enabled = selected > 0 || state.graphsEnabled(now),description = "Показувати графіки у сповіщенні")
                 if (state.graphDismissed && state.graphsEnabled(now)) TextButton(onClick = { request("graphs") }) { Text("Показати знову") }
             } }
             item { SettingsGroup("Для поточного місця") {
                 FilledTonalButton(onClick = { notificationSettings = false; choosingPlace = true },modifier = Modifier.fillMaxWidth()) {
-                    Icon(SvitloIcons.Home,null); Spacer(Modifier.width(8.dp)); Text(focused?.title ?: "Вибрати адресу")
+                    Icon(SvitloIcons.Home,null); Spacer(Modifier.width(8.dp)); Text(focused?.title ?: "Вибрати місце")
                 }
                 SettingSwitch("Попереджати про відключення",state.eventMonitoring,{ if (it) request("events") else vm.monitorEvents(false) },
                     "За 15 хв до початку",enabled = focused?.selected == true,description = "Події поточного місця")
-                if (focused != null && !focused.selected) TextButton(onClick = { vm.select(focused.id,true) }) { Text("Увімкнути адресу у сповіщенні") }
+                if (focused != null && !focused.selected) TextButton(onClick = { vm.select(focused.id,true) }) { Text("Показувати місце у сповіщенні") }
                 PillExample()
-                Text("Зникне на початку. Про відновлення повідомимо окремо після підтвердження VOE.",
+                Text("Сповіщення попереджає про початок за планом. Фактичне відновлення не перевіряється.",
                     style = MaterialTheme.typography.bodySmall,color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.eventMonitoring && event != null) Text("${event.address.title} · ${event.title}",style = MaterialTheme.typography.bodyMedium)
             } }
             item { OutlinedButton(onClick = onNotificationSettings,modifier = Modifier.fillMaxWidth()) { Text("Налаштування Android") } }
         }
     }
-    if (adding) AddAddressPage(vm, onDismiss = { adding = false; vm.clearSearch() })
+    if (adding) AddAddressPage(vm, onDismiss = { adding = false })
     if (info) GuidePage(state,onBack = { info = false },onAndroidSettings = onNotificationSettings)
 }
+    state.addresses.firstOrNull { it.id == feedAddressId }?.let { address ->
+        QueueFeedPage(vm,address,onDismiss={ feedAddressId=null })
+    }
+
 }

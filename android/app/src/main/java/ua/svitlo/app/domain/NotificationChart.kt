@@ -19,6 +19,12 @@ fun Schedule?.chartSpans(start: Instant, end: Instant, now: Instant): List<Chart
             if (instant > start && instant < end) bounds += instant
         }
     }
+    this?.reportedOutages.orEmpty().forEach { incident ->
+        listOfNotNull(incident.startedAt,incident.estimatedEnd).forEach {
+            val instant = Instant.ofEpochMilli(it)
+            if (instant > start && instant < end) bounds += instant
+        }
+    }
     this?.days?.forEach { day ->
         val date = runCatching { java.time.LocalDate.parse(day.date) }.getOrNull() ?: return@forEach
         day.slots.flatMap { listOf(it.startMinute, it.endMinute) }.forEach { minute ->

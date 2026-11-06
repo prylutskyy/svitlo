@@ -8,11 +8,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import ua.svitlo.app.ui.SvitloScreen
 import ua.svitlo.app.ui.SvitloTheme
+import ua.svitlo.app.background.refreshSchedulesOnOpen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        refreshSchedulesOnOpen()
         setContent {
             SvitloTheme {
                 SvitloScreen(onNotificationSettings = {

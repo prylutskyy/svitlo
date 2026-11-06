@@ -187,7 +187,7 @@ class WidgetRefinementTest {
         }
         error("Missing $text: ${nodes().map { it.text to it.contentDescription }}")
     }
-    @Test fun widgetAddressOpensDetailsAndBackReturnsToItsOwnList(): Unit = runBlocking {
+    @Test fun widgetAddressOpensDetailsAndBackReturnsToHome(): Unit = runBlocking {
         val original = context.app.store.load()
         val time = Instant.now()
         val fixture = fixture(time)
@@ -196,11 +196,8 @@ class WidgetRefinementTest {
             shell("input keyevent KEYCODE_WAKEUP"); shell("wm dismiss-keyguard")
             ActivityScenario.launch<WidgetAddressesActivity>(Intent(context,WidgetAddressesActivity::class.java)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,991)).use {
-                val node = awaitNode("Деталі графіка Робота")
-                var clickable: AccessibilityNodeInfo? = node
-                while (clickable != null && !clickable.isClickable) clickable = clickable.parent
-                assertTrue(requireNotNull(clickable).performAction(AccessibilityNodeInfo.ACTION_CLICK))
-                awaitNode("Джерело та оновлення")
+                awaitNode("Налаштування місця")
+                assertNotNull(awaitNode("Дім"))
                 assertTrue(nodes().any { it.text?.toString() == "Сьогодні" })
                 val file = File(context.getExternalFilesDir(null),"widget-refinement/details.png")
                 file.parentFile!!.mkdirs()
@@ -209,17 +206,17 @@ class WidgetRefinementTest {
                 shell("mkdir -p /sdcard/Download/widget-refinement")
                 shell("cp $file /sdcard/Download/widget-refinement/details.png")
                 shell("input keyevent KEYCODE_BACK")
-                awaitNode("Адреси віджета")
-                assertNotNull(awaitNode("Деталі графіка Робота"))
+                awaitNode("Світло")
+                assertTrue(nodes().none { it.text?.toString() == "Адреси віджета" })
             }
             // The contextual widget headline can route straight to its relevant address.
             ActivityScenario.launch<WidgetAddressesActivity>(Intent(context,WidgetAddressesActivity::class.java)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,991)
                 .putExtra(WidgetAddressesActivity.EXTRA_ADDRESS_ID,fixture.addresses[1].id)).use {
-                awaitNode("Джерело та оновлення")
+                awaitNode("Налаштування місця")
                 assertTrue(nodes().any { it.text?.toString() == "Робота" })
                 shell("input keyevent KEYCODE_BACK")
-                awaitNode("Адреси віджета")
+                awaitNode("Світло")
             }
         } finally { context.app.store.update { original } }
     }

@@ -95,7 +95,7 @@ internal fun historyDuration(millis: Long): String {
                     }
                     item { HistoryBreakdown(report) }
                     item { Disclosure("Як рахуємо") {
-                        Text("За даними VOE, без вимірювання напруги. Ймовірні інтервали не входять у суму відключень.",style = MaterialTheme.typography.bodySmall)
+                        Text("За даними джерела, без вимірювання напруги. Ймовірні інтервали не входять у суму відключень.",style = MaterialTheme.typography.bodySmall)
                         Text("Пропуски перевірок позначаємо як невідомі. Історія зберігається на пристрої.",style = MaterialTheme.typography.bodySmall)
                         Text("Перший запис: ${Instant.ofEpochMilli(report.recordedSince!!).atZone(KYIV).format(historyDate)}",style = MaterialTheme.typography.labelMedium)
                     } }
@@ -155,7 +155,7 @@ internal fun historyDuration(millis: Long): String {
                 if (incident.reason.isNotBlank()) Text(incident.reason,style = MaterialTheme.typography.bodyMedium)
                 Text("Останнє спостереження: ${Instant.ofEpochMilli(incident.lastSeen).atZone(KYIV).format(historyDate)}",style = MaterialTheme.typography.bodyMedium)
                 incident.estimatedEnd?.let { Text("Прогноз: ${Instant.ofEpochMilli(it).atZone(KYIV).format(historyDate)}",style = MaterialTheme.typography.bodyMedium) }
-                Text(if (incident.disappearedAt != null) "Завершення — між останнім спостереженням і зняттям з даних VOE." else "Закриття події в даних VOE ще не зафіксовано.",
+                Text(if (incident.disappearedAt != null) "Завершення — між останнім спостереженням і зняттям з даних джерела." else "Закриття події в даних джерела ще не зафіксовано.",
                     style = MaterialTheme.typography.bodyMedium,color = colors.onSurfaceVariant)
             }
         }

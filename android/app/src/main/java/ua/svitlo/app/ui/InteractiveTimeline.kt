@@ -2,6 +2,11 @@ package ua.svitlo.app.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -59,7 +64,8 @@ private val LocalTimelineInteraction = staticCompositionLocalOf { TimelineIntera
     }
 }
 
-@Composable internal fun InteractiveTimeline(spans: List<ChartSpan>, base: TimelineWindow, now: Instant) {
+@Composable internal fun InteractiveTimeline(spans: List<ChartSpan>, base: TimelineWindow, now: Instant,
+    footer: @Composable () -> Unit = {}) {
     val colors = MaterialTheme.colorScheme
     val planned = outageColor(PowerState.SCHEDULED_OUTAGE)
     val reported = outageColor(PowerState.CONFIRMED_OUTAGE)
@@ -68,6 +74,8 @@ private val LocalTimelineInteraction = staticCompositionLocalOf { TimelineIntera
     val key = remember { Any() }
     var focus by remember { mutableStateOf<Instant?>(null) }
     var selected by remember { mutableStateOf<ChartSpan?>(null) }
+    var lastSelected by remember { mutableStateOf<ChartSpan?>(null) }
+    LaunchedEffect(selected) {selected?.let {lastSelected=it}}
     LaunchedEffect(interaction.reset) {
         if (interaction.point?.let { interaction.bounds[key]?.contains(it) } != true) { focus = null; selected = null }
     }
@@ -84,13 +92,13 @@ private val LocalTimelineInteraction = staticCompositionLocalOf { TimelineIntera
     fun select(span: ChartSpan?) { selected = span }
     val continuing = TimelineNavigation.continuing(spans,target)
     val fontScale = LocalDensity.current.fontScale
+    Column(Modifier.fillMaxWidth(),verticalArrangement = Arrangement.spacedBy(6.dp)) {
     Column(Modifier.fillMaxWidth().onGloballyPositioned { interaction.bounds[key] = it.boundsInRoot() },
         verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(),verticalAlignment = Alignment.CenterVertically) {
             Text("${(Duration.between(target.start,target.end).seconds+3599)/3600} год · ${TimelineNavigation.day(target.start,now).lowercase()}",Modifier.weight(1f),
                 style = MaterialTheme.typography.labelMedium,color = colors.onSurfaceVariant)
             if (focus != null) TextButton(onClick = { focus = null; selected = null },contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Зараз") }
-            else Text("Зараз ${now.atZone(KYIV).format(clock)}",style = MaterialTheme.typography.labelMedium,color = colors.onSurfaceVariant)
         }
         Canvas(Modifier.fillMaxWidth().height(48.dp).semantics {
             contentDescription = "Часова шкала. ${target.start.atZone(KYIV).format(clock)}–${target.end.atZone(KYIV).format(clock)}. Натисніть, щоб вибрати інтервал."
@@ -160,20 +168,27 @@ private val LocalTimelineInteraction = staticCompositionLocalOf { TimelineIntera
                 }
             }
         }
-        selected?.let { span ->
-            Text(TimelineNavigation.range(span,now),style = MaterialTheme.typography.bodyMedium)
-            Text(powerLabel(span.state) + when (span.state) {
-                PowerState.CONFIRMED_OUTAGE,PowerState.EMERGENCY_OUTAGE -> " · завершення орієнтовне"
-                in OUTAGE_STATES -> " · ${remainingTime(span.end,span.start)}"
-                else -> ""
-            },
-                style = MaterialTheme.typography.bodySmall,color = colors.onSurfaceVariant)
-        }
         if (continuing != null) TextButton(onClick = { focus = target.end.plusSeconds(3600); selected = continuing },modifier = Modifier.fillMaxWidth()) {
             Text("Відключення триває далі →")
         }
         if (next != null) TextButton(onClick = { jump(next) },modifier = Modifier.fillMaxWidth()) {
             Text("Далі · ${TimelineNavigation.day(next.start,now).lowercase()} ${next.start.atZone(KYIV).format(clock)} →")
+        }
+    }
+        footer()
+        AnimatedVisibility(visible=selected!=null,
+            enter=expandVertically(tween(240))+fadeIn(tween(180)),
+            exit=shrinkVertically(tween(200))+fadeOut(tween(120))) {
+            (selected ?: lastSelected)?.let { span ->
+                Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                    Text(TimelineNavigation.range(span,now),style = MaterialTheme.typography.bodyMedium)
+                    Text(powerLabel(span.state) + when (span.state) {
+                        PowerState.CONFIRMED_OUTAGE,PowerState.EMERGENCY_OUTAGE -> " · завершення орієнтовне"
+                        in OUTAGE_STATES -> " · ${remainingTime(span.end,span.start)}"
+                        else -> ""
+                    },style = MaterialTheme.typography.bodySmall,color = colors.onSurfaceVariant)
+                }
+            }
         }
     }
 }

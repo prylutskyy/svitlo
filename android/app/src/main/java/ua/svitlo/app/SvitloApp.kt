@@ -76,8 +76,8 @@ class SvitloApp : Application() {
         manager.notify("restoration", 3, Notification.Builder(this, NotificationSounds.RESTORATION)
             .setSmallIcon(R.drawable.ic_bolt).setColor(Color.rgb(48,142,107))
             .setContentTitle("$title · Відключення знято")
-            .setContentText("За даними VOE · перевірте живлення")
-            .setStyle(Notification.BigTextStyle().bigText("VOE більше не позначає відключення. Перевірте живлення на місці."))
+            .setContentText("За даними джерела · перевірте живлення")
+            .setStyle(Notification.BigTextStyle().bigText("Джерело більше не позначає відключення. Перевірте живлення на місці."))
             .setContentIntent(open).setAutoCancel(true).setOnlyAlertOnce(false).build())
         prefs.edit().putString("posted", key).apply()
     }

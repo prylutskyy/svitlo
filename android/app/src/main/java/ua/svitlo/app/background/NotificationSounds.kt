@@ -24,6 +24,6 @@ internal object NotificationSounds {
             }
         manager.createNotificationChannels(listOf(
             channel(WARNING, "Попередження про відключення", "Звук під час появи пігулки перед відключенням", "electric_shock"),
-            channel(RESTORATION, "Відновлення світла", "Повідомляє, коли VOE більше не позначає відключення", "community_electro")))
+            channel(RESTORATION, "Відновлення світла", "Повідомляє, коли джерела більше не позначає відключення", "community_electro")))
     }
 }

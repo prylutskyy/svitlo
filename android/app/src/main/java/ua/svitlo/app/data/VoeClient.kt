@@ -1,6 +1,7 @@
 package ua.svitlo.app.data
 
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.withLock
 import okhttp3.*
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONArray
@@ -14,7 +15,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class VoeFormatException(message: String) : IOException(message)
-class VoeHttpException(val status: Int, val retryAt: Long?) : IOException("VOE: HTTP $status")
+class VoeHttpException(val status: Int, val retryAt: Long?) : IOException("Джерело: HTTP $status")
 fun interface ScheduleBatch { suspend fun schedule(address: SavedAddress): Schedule }
 
 object VoeParser {
@@ -61,6 +62,7 @@ object VoeParser {
 
     fun schedule(html: String, now: Instant): Schedule {
         val doc = Jsoup.parse(html)
+        if (doc.select(".gpv-card, .gpv-table, #gpvResult").isNotEmpty()) return NewVoeParser.schedule(html,now)
         val days = mutableListOf<ScheduleDay>()
         doc.select(".disconnection-detailed-table-container").forEach { table ->
             val cells = table.children().filter { it.hasClass("disconnection-detailed-table-cell") }
@@ -147,30 +149,28 @@ object VoeParser {
     }
 }
 
-class VoeClient(private val base: HttpUrl = "https://voe.com.ua/".toHttpUrl()) {
+class VoeClient(private val base: HttpUrl = "https://raw.githubusercontent.com/".toHttpUrl(), private val feedUrl: (FeedProvider)->String = {it.url}, private val emergencyUrl: String = VoeEmergencyParser.URL,
+                private val feedClock: () -> Long = System::currentTimeMillis) {
     val requestCount = java.util.concurrent.atomic.AtomicLong()
     val receivedBytes = java.util.concurrent.atomic.AtomicLong()
-    private val sessionCookies = mutableMapOf<String, List<Cookie>>()
-    private val http = OkHttpClient.Builder()
+    private val cookies=mutableListOf<Cookie>()
+    private val http = OkHttpClient.Builder().cookieJar(object: CookieJar {
+        override fun saveFromResponse(url:HttpUrl,received:List<Cookie>)=synchronized(cookies) {
+            received.forEach { c -> cookies.removeAll{it.name==c.name && it.domain==c.domain && it.path==c.path};cookies.add(c) }
+        }
+        override fun loadForRequest(url:HttpUrl):List<Cookie> = synchronized(cookies) {
+            cookies.removeAll{it.expiresAt<System.currentTimeMillis()};cookies.filter{it.matches(url)}
+        }
+    })
         .connectTimeout(15, TimeUnit.SECONDS).readTimeout(25, TimeUnit.SECONDS).callTimeout(40, TimeUnit.SECONDS)
-        .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
-        .cookieJar(object : CookieJar {
-            override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-                synchronized(sessionCookies) { sessionCookies[url.host] = (sessionCookies[url.host].orEmpty() + cookies).associateBy { it.name }.values.toList() }
-            }
-            override fun loadForRequest(url: HttpUrl): List<Cookie> = synchronized(sessionCookies) {
-                sessionCookies[url.host].orEmpty().filter { it.expiresAt > System.currentTimeMillis() && it.matches(url) }
-            }
-        }).build()
-    private val lookups = object : LinkedHashMap<String, Pair<Long, List<AddressItem>>>(64, .75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Long, List<AddressItem>>>?) = size > 64
-    }
+        .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build()
 
-    private suspend fun request(path: String, form: Map<String, String>? = null): String {
+    internal suspend fun request(path: String,body: FormBody? = null,revalidate: Boolean = false): String {
         val url = base.resolve(path) ?: throw IOException("Некоректна адреса запиту")
-        val builder = Request.Builder().url(url).header("User-Agent", "Svitlo-Android/0.1")
-            .header("X-Requested-With", "XMLHttpRequest")
-        if (form != null) builder.post(FormBody.Builder().apply { form.forEach { (k, v) -> add(k, v) } }.build())
+        val builder = Request.Builder().url(url).header("User-Agent", "Svitlo-Android/0.4")
+        if (revalidate) builder.cacheControl(CacheControl.FORCE_NETWORK)
+
+        if(body!=null) builder.post(body)
         return suspendCancellableCoroutine { continuation ->
             val call = http.newCall(builder.build())
             requestCount.incrementAndGet()
@@ -189,11 +189,11 @@ class VoeClient(private val base: HttpUrl = "https://voe.com.ua/".toHttpUrl()) {
                                 }
                                 throw VoeHttpException(it.code, retry)
                             }
-                            val source = it.body?.source() ?: throw IOException("Порожня відповідь VOE")
+                            val source = it.body?.source() ?: throw IOException("Порожня відповідь джерела")
                             source.request(5_000_001)
                             val bytes = source.buffer.readByteArray()
                             receivedBytes.addAndGet(bytes.size.toLong())
-                            if (bytes.size > 5_000_000) throw IOException("Завелика відповідь VOE")
+                            if (bytes.size > 5_000_000) throw IOException("Завелика відповідь джерела")
                             bytes.toString(Charsets.UTF_8).removePrefix("\uFEFF")
                         }
                         if (continuation.isActive) continuation.resume(text)
@@ -205,35 +205,71 @@ class VoeClient(private val base: HttpUrl = "https://voe.com.ua/".toHttpUrl()) {
         }
     }
 
-    suspend fun suggestions(level: String, query: String, parent: String? = null): List<AddressItem> {
-        require(level in setOf("city", "street", "house"))
-        if (level != "city") require(parent?.matches(Regex("[0-9]+")) == true)
-        val path = "/disconnection/detailed/autocomplete/read_$level" + if (parent == null) "" else "/$parent"
-        val url = base.resolve(path)!!.newBuilder().addQueryParameter("q", query).build()
-        val key = url.toString()
-        synchronized(lookups) { lookups[key] }?.let { (at, rows) -> if (System.currentTimeMillis() - at < 86_400_000) return rows }
-        val rows = VoeParser.suggestions(request(url.encodedPath + "?" + url.encodedQuery))
-        synchronized(lookups) { lookups[key] = System.currentTimeMillis() to rows }
-        return rows
+    private val cacheMutex = kotlinx.coroutines.sync.Mutex()
+    private val cache = java.util.LinkedHashMap<String,Pair<Long,String>>(16,.75f,true)
+    internal suspend fun prominText(path: String, ttl: Long = 120_000): String {
+        require(!path.startsWith("http") && !path.startsWith("//") && ".." !in path)
+        cacheMutex.lock()
+        try {
+            cache[path]?.let { (at,raw) -> if (System.currentTimeMillis()-at < ttl) return raw }
+            val raw = request("https://promin.vlasen.com"+path)
+            cache[path] = System.currentTimeMillis() to raw
+            while (cache.size>24 || cache.values.sumOf { it.second.length.toLong() }>10_000_000) cache.remove(cache.keys.first())
+            return raw
+        } finally { cacheMutex.unlock() }
     }
-
-    /** Owned by one serialized batch: a single GET builds the session for all addresses. */
-    inner class Batch : ScheduleBatch {
-        private var fields: Map<String, String>? = null
-        override suspend fun schedule(address: SavedAddress): Schedule {
-            if (fields == null) fields = VoeParser.form(request("/disconnection/detailed"))
-            val body = fields!! + mapOf("search_type" to "0", "city_id" to address.city.id,
-                "street_id" to address.street.id, "house_id" to address.house.id,
-                "city" to "", "street" to "", "house" to "", "_triggering_element_name" to "search",
-                "_triggering_element_value" to "Показати", "_drupal_ajax" to "1")
-            return try {
-                val html = VoeParser.insertedForm(request("/disconnection/detailed?ajax_form=1&_wrapper_format=drupal_ajax", body))
-                fields = VoeParser.form(html)
-                VoeParser.schedule(html, Instant.now())
-            } catch (e: Exception) {
-                fields = null
-                throw e
+    suspend fun prominConfig(id: String): ProminConfig {
+        val city = ProminCities.get(id)
+        if (city.queueOnly) return ProminParser.queueConfig(city, prominText(city.base + "api/schedule"))
+        return ProminParser.config(city, prominText(city.base + "api/config", 3_600_000))
+    }
+    suspend fun prominStreets(id: String) = ProminParser.streets(prominText(ProminCities.get(id).base + "api/streets", 3_600_000))
+    suspend fun prominHouses(id: String, street: ProminStreet) = ProminParser.houses(prominText(
+        ProminCities.get(id).base + "api/street?id=${street.id}&city=${street.cityId}", 120_000))
+    private val feedMutex=kotlinx.coroutines.sync.Mutex()
+    private val feeds=mutableMapOf<String,Pair<Long,String>>()
+    private suspend fun feedText(id:String,forceRefresh:Boolean = false):String {
+        feedMutex.lock()
+        try {
+            val provider=FeedProviders.get(id)
+            if (!forceRefresh) feeds[id]?.let {
+                val age = feedClock()-it.first
+                if (age in 0 until RefreshPolicy.FOREGROUND_MILLIS) return it.second
             }
+            val raw=request(feedUrl(provider),revalidate=true)
+            feeds[id]=feedClock() to raw
+            return raw
+        } finally {feedMutex.unlock()}
+    }
+    suspend fun feedGroups(id:String)=QueueFeedParser.groups(feedText(id),Instant.now())
+    val emergency=VoeEmergencyClient(this,emergencyUrl)
+    inner class Batch(private val forceRefresh:Boolean = false) : ScheduleBatch {
+        private val batchMutex = kotlinx.coroutines.sync.Mutex()
+        private val batchFeeds = mutableMapOf<String,Result<String>>()
+        // One source snapshot (or failure) per operator, even when manual refresh bypasses cache.
+        private suspend fun text(id:String):String = batchMutex.withLock {
+            val result = batchFeeds[id] ?: run {
+                val fetched = try { Result.success(feedText(id,forceRefresh))
+                } catch(e:kotlinx.coroutines.CancellationException) { throw e
+                } catch(e:Exception) { Result.failure<String>(e) }
+                batchFeeds[id] = fetched
+                fetched
+            }
+            result.getOrThrow()
+        }
+        override suspend fun schedule(address:SavedAddress):Schedule {
+            val id=address.feedId?.takeUnless{it.startsWith("promin/")}
+                ?: throw VoeFormatException("Виберіть оператора та чергу: «Джерело та аварії».")
+            val provider=FeedProviders.get(id)
+            val group=address.feedGroup ?: throw VoeFormatException("Виберіть чергу")
+            suspend fun <T> capture(f:suspend ()->T):Result<T> = try{Result.success(f())}
+                catch(e:kotlinx.coroutines.CancellationException){throw e}
+                catch(e:Exception){Result.failure(e)}
+            val plan=capture{QueueFeedParser.schedule(text(id),group,provider,Instant.now())}
+            val incidentAddress=address.voeIncidentAddress
+            if(incidentAddress==null) return plan.getOrThrow()
+            val events=capture{emergency.snapshot(incidentAddress.regionId,Instant.now())}
+            return VoeEmergencyClient.combine(plan,events,incidentAddress,provider.url,Instant.now())
         }
     }
 }

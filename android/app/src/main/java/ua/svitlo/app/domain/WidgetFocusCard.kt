@@ -58,7 +58,10 @@ data class WidgetFocusCard(val row: ChartRow, val label: String, val time: Strin
             val last = schedule?.days.orEmpty().mapNotNull { runCatching {
                 LocalDate.parse(it.date).plusDays(1).atStartOfDay(KYIV).toInstant()
             }.getOrNull() }.maxOrNull() ?: chart.end
-            val spans = schedule.chartSpans(chart.now, maxOf(chart.end, minOf(last, chart.now.plusSeconds(7 * 86400))), chart.now)
+            // Show published queue times even when an optional address check is unavailable.
+            // The current-incident branch above still requires its own restoration evidence.
+            val plan = if (row.address.feedId != null && !row.address.feedId.startsWith("promin/")) schedule?.publishedQueuePlan() else schedule
+            val spans = plan.chartSpans(chart.now, maxOf(chart.end, minOf(last, chart.now.plusSeconds(7 * 86400))), chart.now)
             if (row.current in outages) {
                 val end = spans.firstOrNull { it.start > chart.now && it.state != row.current }
                 val label = "За графіком до"

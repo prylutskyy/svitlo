@@ -29,8 +29,9 @@ class StateStore(context: Context) {
                     gson.fromJson(reader, AppState::class.java) ?: error("Не вдалося прочитати локальні дані")
                 } else AppState()
                 // Preserve an active old session as an unlimited opt-in; expired sessions stay off.
-                val migrated = if (saved.notificationsEnabled == null) saved.copy(
+                val control = if (saved.notificationsEnabled == null) saved.copy(
                     notificationsEnabled = saved.graphsEnabled(java.time.Instant.now()), session = null) else saved
+                val migrated = ProminMigration.apply(control)
                 if (migrated != saved) write(migrated)
                 mutable.value = migrated
                 loaded = true

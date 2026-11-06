@@ -33,8 +33,8 @@ class EventNotifications(private val context: Context) {
         }
         val timing = "Початок о $startTime"
         val explanation = when {
-            event.emergency -> "Аварійне повідомлення VOE"
-            else -> "За графіком VOE"
+            event.emergency -> "Аварійне повідомлення джерела"
+            else -> "За графіком джерела"
         }
         // Native templates preserve promotion, accessibility and the system-owned countdown.
         val accent = when { event.emergency -> Color.rgb(187,37,43); else -> Color.rgb(169,87,0) }

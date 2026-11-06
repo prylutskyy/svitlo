@@ -30,9 +30,69 @@ class RefreshIntegrationTest {
         val scoped = object : ContextWrapper(context) { override fun getFilesDir() = folder }
         return StateStore(scoped).also { diskContexts[it] = scoped; it.load() }
     }
-    private fun state(source: Schedule) = AppState(addresses = listOf(address),notificationsEnabled = true,eventMonitoring = true,
+    // Exercise persistence of the current schema; source migration has its own tests.
+    private fun state(source: Schedule) = AppState(dataSourceVersion=2,addresses = listOf(address),notificationsEnabled = true,eventMonitoring = true,
         currentAddressId = address.id,schedules = listOf(CachedSchedule(address.id,source)),
         attempts = listOf(FetchAttempt(address.id,source.fetchedAt,0,null)))
+
+    @Test fun manualRefreshRetriesAfterFiveSecondsAndDeduplicatesConcurrentClicks(): Unit = runBlocking {
+        val store = isolated()
+        store.update { state(schedule(at,outage=false)).copy(eventMonitoring=false) }
+        var clock = at.plusSeconds(4)
+        var calls = 0
+        val repo = Repository(store,VoeClient(),{clock},{ ScheduleBatch {
+            calls++
+            kotlinx.coroutines.delay(50)
+            schedule(clock,outage=false)
+        } })
+        assertTrue(repo.refresh(manual=true));assertEquals(0,calls)
+        clock = at.plusSeconds(5)
+        coroutineScope {
+            listOf(async { repo.refresh(manual=true) },async { repo.refresh(manual=true) }).forEach { assertTrue(it.await()) }
+        }
+        assertEquals(1,calls)
+        clock = at.plusSeconds(10)
+        assertTrue(repo.refresh(manual=true));assertEquals(2,calls)
+    }
+    @Test fun openingChecksWidgetOnlyPlaceEvenWithNotificationsDisabled():Unit=runBlocking {
+        val store=isolated()
+        val widgetAddress=address.copy(selected=false)
+        store.update {state(schedule(at,outage=false)).copy(addresses=listOf(widgetAddress),notificationsEnabled=false,
+            currentAddressId=null,eventMonitoring=false,widgets=listOf(WidgetConfig(811,listOf(address.id))))}
+        var calls=0
+        val clock=at.plusSeconds(5)
+        val repo=Repository(store,VoeClient(),{clock},{ScheduleBatch {calls++;schedule(clock,outage=false)}})
+        repo.refresh(false,foreground=true);assertEquals(0,calls)
+        repo.refresh(false,opened=true);assertEquals(1,calls)
+        repo.refresh(false,opened=true);assertEquals(1,calls)
+    }
+    @Test fun visiblePlaceRefreshesEvenWhenExcludedFromBackgroundNotifications():Unit=runBlocking {
+        val store=isolated()
+        store.update {state(schedule(at,outage=false)).copy(addresses=listOf(address.copy(selected=false)),notificationsEnabled=false,
+            currentAddressId=null,eventMonitoring=false,widgets=emptyList())}
+        var calls=0;var clock=at.plusSeconds(5)
+        val repo=Repository(store,VoeClient(),{clock},{ScheduleBatch {calls++;schedule(clock,outage=false)}})
+        repo.refresh(false);assertEquals(0,calls)
+        repo.refresh(false,opened=true);assertEquals(1,calls)
+        clock=at.plusSeconds(65)
+        repo.refresh(false,foreground=true);assertEquals(2,calls)
+        clock=at.plusSeconds(70)
+        repo.refresh(manual=true);assertEquals(3,calls)
+    }
+
+    @Test fun quietBackgroundChecksAtFifteenMinutesAndForegroundChecksAtOneMinute(): Unit = runBlocking {
+        val store = isolated()
+        store.update { state(schedule(at,outage=false)).copy(eventMonitoring=false) }
+        var clock = at.plusSeconds(60)
+        var calls = 0
+        val repo = Repository(store,VoeClient(),{clock},{ ScheduleBatch { calls++;schedule(clock,outage=false) } })
+        repo.refresh(false);assertEquals(0,calls)
+        repo.refresh(false,foreground=true);assertEquals(1,calls)
+        clock = at.plusSeconds(959)
+        repo.refresh(false);assertEquals(1,calls)
+        clock = at.plusSeconds(960)
+        repo.refresh(false);assertEquals(2,calls)
+    }
 
     @Test fun endDeadlineFetchesImmediatelyPublishesAndDeduplicatesConcurrentTriggers(): Unit = runBlocking {
         val store = isolated()

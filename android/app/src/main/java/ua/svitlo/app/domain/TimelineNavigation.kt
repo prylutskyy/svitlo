@@ -10,8 +10,10 @@ fun Schedule?.inspectionSpans(window: TimelineWindow, now: Instant): List<ChartS
     val dates = this?.days.orEmpty().mapNotNull { runCatching { LocalDate.parse(it.date) }.getOrNull() }
     val first = dates.minOrNull()?.atStartOfDay(KYIV)?.toInstant() ?: window.start
     val last = dates.maxOrNull()?.plusDays(1)?.atStartOfDay(KYIV)?.toInstant() ?: window.end
-    val start = minOf(window.start, first, this?.currentOutage?.startedAt?.let(Instant::ofEpochMilli) ?: window.start)
-    val end = maxOf(window.end, last, this?.currentOutage?.estimatedEnd?.let(Instant::ofEpochMilli) ?: window.end)
+    val eventStarts=this?.reportedOutages.orEmpty().mapNotNull {it.startedAt}.minOrNull()?.let(Instant::ofEpochMilli) ?: window.start
+    val eventEnds=this?.reportedOutages.orEmpty().mapNotNull {it.estimatedEnd}.maxOrNull()?.let(Instant::ofEpochMilli) ?: window.end
+    val start = listOf(eventStarts,window.start,first,this?.currentOutage?.startedAt?.let(Instant::ofEpochMilli) ?: window.start).minOrNull()!!
+    val end = listOf(eventEnds,window.end,last,this?.currentOutage?.estimatedEnd?.let(Instant::ofEpochMilli) ?: window.end).maxOrNull()!!
     return chartSpans(start, end, now)
 }
 
